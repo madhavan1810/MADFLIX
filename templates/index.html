@@ -1,0 +1,166 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MadFlix </title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'assets/style.css' %}" />
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+
+<body class="text-white bg-black">
+  <header class="p-5 flex justify-between items-center bg-black">
+    <a href="{% url 'index' %}">
+      <img src="https://sdmntpreastus.oaiusercontent.com/files/00000000-7be4-61f9-8adf-e5d4b6c20298/raw?se=2025-06-23T14%3A47%3A20Z&sp=r&sv=2024-08-04&sr=b&scid=8e57b80b-aef1-5516-839a-6473741faab4&skoid=02b7f7b5-29f8-416a-aeb6-99464748559d&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-06-22T23%3A50%3A44Z&ske=2025-06-23T23%3A50%3A44Z&sks=b&skv=2024-08-04&sig=eG38vDX8fSU2SQlwMi3P%2B0JRP6Y6MnNrYfu9gMBhMhc%3D" width="110" height="30" alt="MadFlix Logo" />
+    </a>
+
+    <nav class="flex space-x-5">
+      <a href="{% url 'index' %}" class="hover:text-red-500">Home</a>
+
+      <div class="relative dropdown">
+        <span id="dropdownMenuButton" class="cursor-pointer hover:text-red-500">Genres ▼</span>
+        <div id="dropdownMenu" class="dropdown-content hidden absolute bg-black p-2 rounded mt-1 z-50">
+          {% for code, name in genre_choices %}
+            <a class="block px-2 py-1 hover:bg-gray-900" href="{% url 'genre' code %}">{{ name }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <a href="{% url 'my-list' %}" class="hover:text-red-500">My List</a>
+    </nav>
+
+    <div class="flex items-center space-x-5">
+      <form action="{% url 'search' %}" method="post" onsubmit="this.querySelector('button').textContent='Searching...';">
+        {% csrf_token %}
+        <input type="search" name="search_term" placeholder="Search" class="bg-gray-900 p-2 rounded" />
+        <button type="submit" class="bg-red-600 p-2 rounded hover:bg-red-500">Search</button>
+      </form>
+
+      {% if user.is_authenticated %}
+        <span>Welcome, {{ user.username }}</span>
+        <a href="{% url 'logout' %}" class="hover:text-red-500">Logout</a>
+      {% else %}
+        <a href="{% url 'login' %}" class="hover:text-red-500">Login</a>
+        <a href="{% url 'signup' %}" class="hover:text-red-500">Sign Up</a>
+      {% endif %}
+    </div>
+  </header>
+
+  {% if featured_movie %}
+  <section class="relative py-20 px-10" style="background: url('{{ featured_movie.image_cover.url }}') center/cover;">
+    <div class="bg-black bg-opacity-70 p-10 rounded">
+      <h1 class="text-5xl mb-5">{{ featured_movie.title }}</h1>
+      <p class="mb-5">{{ featured_movie.description }}</p>
+      <a href="{% url 'movie' featured_movie.uu_id %}">
+        <button class="bg-red-600 px-5 py-2 rounded hover:bg-red-500">Play</button>
+      </a>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="py-10 px-5">
+    <h2 class="text-xl mb-5">Popular on MadFlix</h2>
+    <div class="flex space-x-5 overflow-x-auto">
+      {% for movie in movies %}
+        <div class="w-40 h-64 flex-shrink-0 film-card cursor-pointer hover:scale-105 transform transition duration-300"
+             onclick="showModal(this)"
+             data-uuid="{{ movie.uu_id }}"
+             data-title="{{ movie.title }}"
+             data-description="{{ movie.description }}"
+             data-year="{{ movie.release_date|date:'Y' }}"
+             data-genre="{{ movie.get_genre_display }}"
+             data-length="{{ movie.length }}"
+             data-image-card="{{ movie.image_card.url }}"
+             data-image-cover="{{ movie.image_cover.url }}"
+             style="background: url('{{ movie.image_card.url }}') center/cover; border-radius: 0.5rem;"
+             title="{{ movie.title }} | {{ movie.get_genre_display }}">
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="modal fixed inset-0 bg-black bg-opacity-90 hidden" id="movieModal">
+    <div class="modal-content bg-black max-w-2xl mx-auto mt-20 p-6 rounded text-white relative">
+      <button class="absolute top-4 right-4 text-xl" onclick="hideModal()">×</button>
+      <h2 class="text-2xl mb-4"></h2>
+      <img class="w-full mb-4 rounded" src="" alt="">
+      <div class="flex justify-between mb-4">
+        <span class="year"></span>
+        <span class="genre"></span>
+        <span class="length"></span>
+      </div>
+      <p class="mb-4 description"></p>
+      <div class="flex space-x-4">
+        <a id="playLink" href="">
+          <button class="bg-red-600 px-4 py-2 rounded hover:bg-red-500">Play</button>
+        </a>
+        <button id="addToListBtn" class="border border-white px-4 py-2 rounded hover:bg-gray-800">
+          Add to List
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const csrfToken = '{{ csrf_token }}';
+
+    function showModal(el) {
+      const modal = document.getElementById('movieModal');
+      modal.querySelector('h2').textContent = el.dataset.title;
+      modal.querySelector('img').src = el.dataset.imageCover;
+      modal.querySelector('img').alt = el.dataset.title;
+      modal.querySelector('.year').textContent = `Year: ${el.dataset.year}`;
+      modal.querySelector('.genre').textContent = `Genre: ${el.dataset.genre}`;
+      modal.querySelector('.length').textContent = `Length: ${el.dataset.length} min`;
+      modal.querySelector('.description').textContent = el.dataset.description;
+      modal.querySelector('#playLink').href = `/movie/${el.dataset.uuid}/`;
+      modal.classList.remove('hidden');
+    }
+
+    function hideModal() {
+      document.getElementById('movieModal').classList.add('hidden');
+    }
+
+    document.getElementById('addToListBtn').onclick = function () {
+      const movieId = document.querySelector('#playLink').href.split('/').slice(-2, -1)[0];
+      this.textContent = 'Adding...';
+      this.disabled = true;
+
+      $.post("{% url 'add-to-list' %}", {
+        movie_id: movieId,
+        csrfmiddlewaretoken: csrfToken
+      })
+      .done(data => {
+        this.textContent = data.message || 'Added';
+      })
+      .fail((_, __, err) => {
+        this.textContent = 'Error';
+        this.disabled = false;
+        console.error("Add to list error:", err);
+      });
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const btn = document.getElementById("dropdownMenuButton");
+      const menu = document.getElementById("dropdownMenu");
+      btn.addEventListener("click", () => {
+        menu.classList.toggle("hidden");
+      });
+      document.addEventListener("click", (e) => {
+        if (!btn.contains(e.target) && !menu.contains(e.target)) {
+          menu.classList.add("hidden");
+        }
+      });
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        hideModal();
+      }
+    });
+  </script>
+</body>
+</html>
